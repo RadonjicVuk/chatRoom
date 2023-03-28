@@ -10,8 +10,17 @@ const io = new Server(server)
 app.use(express.static('public'))
 
 io.on('connection', (socket) => {
-    console.log("new con");
-    socket.emit("message", "cukam")
+    socket.emit("message", "Welcome")
+
+    socket.broadcast.emit('message', 'A user has joined the chat')
+
+    socket.on('disconnect', () => {
+        io.emit('message', 'A user has left the chat')
+    })
+
+    socket.on('chatMessage', (message) => {
+        io.emit('message', message)
+    })
 })
 
 const PORT = process.env.PORT || 8080
