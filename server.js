@@ -1,8 +1,8 @@
 import express from "express"
-import path from "path"
 import {Server} from "socket.io"
 import http from "http"
-
+import {formatMessage} from "./utils/messages.js"
+import { userJoin, currentUser, userLeave, getRoomUsers } from "./utils/users.js"
 const app = express()
 const server = http.createServer(app)
 const io = new Server(server)
@@ -10,17 +10,37 @@ const io = new Server(server)
 app.use(express.static('public'))
 
 io.on('connection', (socket) => {
-    socket.emit("message", "Welcome")
+    socket.on('joinRoom', ({username, room}) => {
+        const user = userJoin(socket.id, username, room)
+        
+        socket.join(user.room)
 
-    socket.broadcast.emit('message', 'A user has joined the chat')
-
+        socket.emit("message", formatMessage('Bot',`Welcome`))
+        socket.broadcast.to(user.room).emit('message', formatMessage('Bot',`${user.username} has joined the chat`))
+        
+        io.to(user.room).emit('roomUsers', {
+            room: user.room,
+            users: getRoomUsers(user.room)
+        })
+    })
+    
     socket.on('disconnect', () => {
-        io.emit('message', 'A user has left the chat')
+        const user = userLeave(socket.id)
+        if(user){
+            io.to(user.room).emit('message', formatMessage('Bot',`${user.username} has left the chat`))
+            io.to(user.room).emit('roomUsers', {
+                room: user.room,
+                users: getRoomUsers(user.room)
+            })
+        }
     })
 
     socket.on('chatMessage', (message) => {
-        io.emit('message', message)
+        const user = currentUser(socket.id)
+        io.to(user.room).emit('message', formatMessage(user.username,message))
     })
+
+
 })
 
 const PORT = process.env.PORT || 8080
